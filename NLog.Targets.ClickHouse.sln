@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NLog.Targets.ClickHouse", "src\NLog.Targets.ClickHouse\NLog.Targets.ClickHouse.csproj", "{93E8C977-29AC-4798-BDAF-40D6B9BB2DED}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NLog.Targets.ClickHouse.Test", "test\NLog.Targets.ClickHouse.Test\NLog.Targets.ClickHouse.Test.csproj", "{C76FFE80-4DE0-4AA2-AC1F-B4DF6FA6BFA0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4FE52566-6B78-49BA-9D12-A2D0D1222599}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{597BFBE6-DBB8-48BF-A0E8-F6C420459AB4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{93E8C977-29AC-4798-BDAF-40D6B9BB2DED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93E8C977-29AC-4798-BDAF-40D6B9BB2DED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{93E8C977-29AC-4798-BDAF-40D6B9BB2DED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{93E8C977-29AC-4798-BDAF-40D6B9BB2DED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C76FFE80-4DE0-4AA2-AC1F-B4DF6FA6BFA0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C76FFE80-4DE0-4AA2-AC1F-B4DF6FA6BFA0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C76FFE80-4DE0-4AA2-AC1F-B4DF6FA6BFA0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C76FFE80-4DE0-4AA2-AC1F-B4DF6FA6BFA0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{93E8C977-29AC-4798-BDAF-40D6B9BB2DED} = {4FE52566-6B78-49BA-9D12-A2D0D1222599}
+		{C76FFE80-4DE0-4AA2-AC1F-B4DF6FA6BFA0} = {597BFBE6-DBB8-48BF-A0E8-F6C420459AB4}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net5.0;netstandard2.1</TargetFrameworks>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Title> A NLog target that writes to ClickHouse table</Title>
+        <Authors>hulk8</Authors>
+        <Description> A NLog target that writes to ClickHouse table</Description>
+        <PackageProjectUrl>https://github.com/hulk8/Nlog.Targets.ClickHouse</PackageProjectUrl>
+        <PackageTags>nlog,clickhouse</PackageTags>
+        <AssemblyVersion>1.0.0</AssemblyVersion>
+        <FileVersion>1.0.0</FileVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="ClickHouse.Client" Version="4.2.2" />
+      <PackageReference Include="NLog" Version="4.7.11" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="ClickHouseLoaderV2.cs" />
+      <None Include="ClickHouseLoaderV2.cs" />
+    </ItemGroup>
+
+</Project>
