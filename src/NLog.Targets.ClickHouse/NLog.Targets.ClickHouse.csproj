@@ -3,9 +3,9 @@
     <PropertyGroup>
         <TargetFrameworks>net5.0;netstandard2.1</TargetFrameworks>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <Title> A NLog target that writes to ClickHouse table</Title>
+        <Title>NLog target that pushes log messages to ClickHouse </Title>
         <Authors>hulk8</Authors>
-        <Description> A NLog target that writes to ClickHouse table</Description>
+        <Description>NLog target that pushes log messages to ClickHouse </Description>
         <PackageProjectUrl>https://github.com/hulk8/Nlog.Targets.ClickHouse</PackageProjectUrl>
         <PackageTags>nlog,clickhouse</PackageTags>
         <AssemblyVersion>1.0.0</AssemblyVersion>
