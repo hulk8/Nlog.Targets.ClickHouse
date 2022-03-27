@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using ClickHouse.Ado;
 using NLog.Common;
 using NLog.Config;
@@ -17,6 +20,8 @@ namespace NLog.Targets.ClickHouse
 
         //TODO: add loading with batches of fixed size 
         public int BatchSize { get; set; } = 10000;
+        
+        public TimeSpan FlushTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
         [ArrayParameter(typeof(DatabaseCommandInfo), "install-command")]
         public IList<DatabaseCommandInfo> InstallDdlCommands { get; private set; } = new List<DatabaseCommandInfo>();
@@ -32,6 +37,12 @@ namespace NLog.Targets.ClickHouse
         public bool IsInstalled { get; private set; }
         
         private string _activeConnectionString;
+        
+        private readonly ConcurrentQueue<LogEventInfo> _internalQueue = new ConcurrentQueue<LogEventInfo>();
+
+        private CancellationTokenSource _source;
+        
+        private Task _loadingEventsTask;
 
         public ClickHouseTarget()
         {
@@ -55,6 +66,12 @@ namespace NLog.Targets.ClickHouse
                     var command = connection.CreateCommand("SELECT version()");
                     command.ExecuteNonQuery();
                 }
+                
+                Install(new InstallationContext());
+
+                _source = new CancellationTokenSource();
+                _loadingEventsTask = CheckingEventsAsync(_source.Token); 
+                
                 InternalLogger.Info("ClickHouseTarget(Name={0}): Target initiated", Name);
             }
             catch (Exception ex)
@@ -62,8 +79,6 @@ namespace NLog.Targets.ClickHouse
                 InternalLogger.Error(ex, "ClickHouseTarget(Name={0}): Failed to init target", Name);
                 throw;
             }
-            
-            Install(new InstallationContext());
         }
 
         protected string BuildConnectionString()
@@ -73,17 +88,8 @@ namespace NLog.Targets.ClickHouse
 
         protected override void Write(LogEventInfo logEvent)
         {
-            try
-            {
-                InternalLogger.Warn("ClickhouseTarget(Name={0}): Writing logs single, you should use BufferingWrapper: https://github.com/NLog/NLog/wiki/BufferingWrapper-target", Name);
-                //TODO: add ConcurrentQueue<LogEventInfo> and check task for loading sync messages
-                Write(new List<AsyncLogEventInfo>{new AsyncLogEventInfo(logEvent, exception => {})});
-            }
-            catch (Exception ex)
-            {
-                InternalLogger.Error(ex, "ClickHouseTarget(Name={0}): Error when writing to database.", Name);
-                throw;
-            }
+            //InternalLogger.Warn("ClickhouseTarget(Name={0}): Writing logs single, you should use BufferingWrapper: https://github.com/NLog/NLog/wiki/BufferingWrapper-target", Name);
+            _internalQueue.Enqueue(logEvent);
         }
         
         [Obsolete("Instead override Write(IList<AsyncLogEventInfo> logEvents. Marked obsolete on NLog 4.5")]
@@ -92,33 +98,69 @@ namespace NLog.Targets.ClickHouse
             Write((IList<AsyncLogEventInfo>)logEvents);
         }
         
-        protected override void Write(IList<AsyncLogEventInfo> logEvents)
+        protected override void Write(IList<AsyncLogEventInfo> asyncLogEvents)
         {
             try
             {
-                InternalLogger.Trace("ClickhouseTarget(Name={0}): Writing logs batch; count: {1};", Name, logEvents.Count);
-                using (var conn = new ClickHouseConnection(_activeConnectionString))
-                {
-                    conn.Open();
-                    var command = conn.CreateCommand($"INSERT INTO {TableName} ({string.Join(", ", Columns.Select(x => $"`{x}`"))}) VALUES @bulk;");
-                    command.Parameters.Add(
-                        new ClickHouseParameter
-                        {
-                            DbType = DbType.Object,
-                            ParameterName = "bulk",
-                            Value = logEvents.Select(al => WrapParameters(al.LogEvent))
-                        }
-                    );
-                    command.ExecuteNonQuery();
-                }
+                InternalLogger.Trace("ClickhouseTarget(Name={0}): Writing logs batch; count: {1};", Name, asyncLogEvents.Count);
+                WriteLogsImpl(asyncLogEvents.Select(al => al.LogEvent));
             }
             catch (Exception ex)
             {
-                InternalLogger.Error(ex, "ClickHouseTarget(Name={0}): Error when writing to database.", Name);
+                InternalLogger.Error(ex, "ClickHouseTarget(Name={0}): Error writing to database.", Name);
                 throw;
             }
         }
 
+        protected virtual void WriteLogsImpl(IEnumerable<LogEventInfo> logEvents)
+        {
+            using (var conn = new ClickHouseConnection(_activeConnectionString))
+            {
+                conn.Open();
+                var command = conn.CreateCommand($"INSERT INTO {TableName} ({string.Join(", ", Columns.Select(x => $"`{x}`"))}) VALUES @bulk;");
+                command.Parameters.Add(
+                    new ClickHouseParameter
+                    {
+                        DbType = DbType.Object,
+                        ParameterName = "bulk",
+                        Value = logEvents.Select(WrapParameters)
+                    }
+                );
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private async Task CheckingEventsAsync(CancellationToken cancellationToken = default)
+        {
+            InternalLogger.Trace("ClickhouseTarget(Name={0}): Checking task started", Name);
+            
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    var batch = new List<LogEventInfo>();
+                    while (_internalQueue.TryDequeue(out var logEventInfo))
+                        batch.Add(logEventInfo);
+
+                    if (batch.Any())
+                        WriteLogsImpl(batch);
+
+                    await Task.Delay(FlushTimeout, cancellationToken);
+                }
+                catch (TaskCanceledException ex)
+                {
+
+                }
+                catch (Exception ex)
+                {
+                    InternalLogger.Error(ex, "ClickHouseTarget(Name={0}): Error writing to database.", Name);
+                    throw;
+                }
+            }
+            
+            InternalLogger.Trace("ClickhouseTarget(Name={0}): Checking task completed", Name);
+        }
+        
         protected virtual object[] WrapParameters(LogEventInfo logEvent)
         {
             var values = new object[Parameters.Count];
@@ -178,6 +220,9 @@ namespace NLog.Targets.ClickHouse
 
         protected override void CloseTarget()
         {
+            _source.Cancel();
+            _loadingEventsTask.Wait(TimeSpan.FromSeconds(15));
+            
             Uninstall(new InstallationContext { IgnoreFailures = true });
             InternalLogger.Trace("ClickhouseTarget(Name={0}): Close connection because of CloseTarget", Name);
         }

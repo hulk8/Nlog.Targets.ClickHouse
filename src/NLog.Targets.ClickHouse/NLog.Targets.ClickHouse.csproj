@@ -3,13 +3,15 @@
     <PropertyGroup>
         <TargetFrameworks>net5.0;netstandard2.1</TargetFrameworks>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <Title>NLog target that pushes log messages to ClickHouse </Title>
+        <Title>Implementation of ClickHouse target for Nlog</Title>
         <Authors>hulk8</Authors>
-        <Description>NLog target that pushes log messages to ClickHouse </Description>
+        <Description>Implementation of ClickHouse target for Nlog</Description>
         <PackageProjectUrl>https://github.com/hulk8/Nlog.Targets.ClickHouse</PackageProjectUrl>
         <PackageTags>nlog,clickhouse</PackageTags>
-        <AssemblyVersion>1.0.0</AssemblyVersion>
-        <FileVersion>1.0.0</FileVersion>
+        <AssemblyVersion>1.1.0</AssemblyVersion>
+        <FileVersion>1.1.0</FileVersion>
+        <PackageVersion>1.1.0</PackageVersion>
+        <RepositoryUrl>https://github.com/hulk8/Nlog.Targets.ClickHouse</RepositoryUrl>
     </PropertyGroup>
 
     <ItemGroup>

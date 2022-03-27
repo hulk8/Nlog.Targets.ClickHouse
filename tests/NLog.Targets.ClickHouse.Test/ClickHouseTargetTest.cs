@@ -18,7 +18,7 @@ namespace NLog.Targets.ClickHouse.Test
 
         public static string ConnectionString { get; } = "Host=localhost;Port=9000;Database=logs;User=sa;Password=P@ssw0rd;";
 
-        public static string XmlConfig { get; } = @"
+        public static string XmlConfigWithBufferedWrapper { get; } = @"
             <nlog xmlns='http://www.nlog-project.org/schemas/NLog.xsd'
                   xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
                   internalLogToConsole='true'
@@ -61,6 +61,45 @@ namespace NLog.Targets.ClickHouse.Test
               </targets>
               <rules>
                 <logger name='*' minlevel='Trace' writeTo='clickhouse_queue' />
+              </rules>
+            </nlog>";
+        
+        public static string XmlConfigWithInternalQueue { get; } = @"
+            <nlog xmlns='http://www.nlog-project.org/schemas/NLog.xsd'
+                  xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
+                  internalLogToConsole='true'
+                  autoReload='true'>
+              <targets>
+                <target name='clickhouse' 
+                          xsi:type='ClickHouse' 
+                          connectionString='Host=localhost;Port=9000;Database=logs;User=sa;Password=P@ssw0rd;'
+                          tableName='test'
+                          batchSize='5000'>
+                    <install-command text='
+                        CREATE TABLE IF NOT EXISTS test
+                        (
+                            logged DateTime64,
+                            application String,
+                            level LowCardinality(String),
+                            message String,
+                            logger String,
+                            callSite String,
+                            exception Nullable(String)
+                        )
+                        ENGINE Log' />
+                    <install-command text='TRUNCATE TABLE test' />
+                    <uninstall-command text='DROP TABLE IF EXISTS test' />
+                    <parameter name='application' dbType='String' layout='test_app'/>
+                    <parameter name='level' dbType='String' layout='${level}' />
+                    <parameter name='message' dbType='String' layout='${message}' />
+                    <parameter name='logger' dbType='String' layout='${logger}' />
+                    <parameter name='callSite' dbType='String' allowDbNull='true' layout='${callsite:filename=true}' />
+                    <parameter name='exception' dbType='String' allowDbNull='true' layout='${exception:tostring}' />
+                    <parameter name='logged' dbType='DateTime64' layout='${date}' />
+                  </target>
+              </targets>
+              <rules>
+                <logger name='*' minlevel='Trace' writeTo='clickhouse' />
               </rules>
             </nlog>";
         
@@ -132,9 +171,24 @@ namespace NLog.Targets.ClickHouse.Test
         {
             await base.StartupAsync();
         }
-
+        
         [Test]
-        public void WriteLog()
+        public void ConfigXml()
+        {
+            LoggingConfiguration config = XmlLoggingConfiguration.CreateFromXmlString(XmlConfigWithBufferedWrapper);
+
+            var target = config.FindTargetByName("clickhouse") as ClickHouseTarget;
+            Assert.NotNull(target);
+            Assert.AreEqual("clickhouse", target.Name);
+            Assert.AreEqual("Host=localhost;Port=9000;Database=logs;User=sa;Password=P@ssw0rd;", target.ConnectionString);
+            Assert.AreEqual("logs.test", target.TableName);
+            Assert.AreEqual(5000, target.BatchSize);
+            Assert.AreEqual(7, target.Columns.Length);
+            Assert.AreEqual(7, target.Parameters.Count);
+        }
+        
+        [Test]
+        public async Task WriteAsyncLogEvent()
         {
             var target = ServiceProvider.GetRequiredService<ClickHouseTarget>();
             var installationContext = ServiceProvider.GetRequiredService<InstallationContext>();
@@ -145,19 +199,22 @@ namespace NLog.Targets.ClickHouse.Test
             var exceptions = new List<Exception>();
             target.Install(installationContext);
             Assert.True(ShowTables().Contains(target.TableName));
+            
             target.WriteAsyncLogEvent(new AsyncLogEventInfo(LogEventInfo.Create(LogLevel.Debug, "logger_name", "message text"), exceptions.Add));
             
             foreach (var ex in exceptions)
                 Assert.Null(ex);
+
+            await Task.Delay(TimeSpan.FromSeconds(10));
             
             Assert.AreEqual(1, GetTableSize(target.TableName));
             
             target.Uninstall(installationContext);
             Assert.False(ShowTables().Contains(target.TableName));
         }
-        
+
         [Test]
-        public void WriteLogs()
+        public void WriteAsyncLogEvents()
         {
             var target = ServiceProvider.GetRequiredService<ClickHouseTarget>();
             var installationContext = ServiceProvider.GetRequiredService<InstallationContext>();
@@ -187,25 +244,27 @@ namespace NLog.Targets.ClickHouse.Test
         }
 
         [Test]
-        public void ConfigXml()
+        [TestCase(5000)]
+        public async Task Generate_sample_logs_with_BufferingWrapper(int count)
         {
-            LoggingConfiguration config = XmlLoggingConfiguration.CreateFromXmlString(XmlConfig);
+            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(XmlConfigWithBufferedWrapper);
+            var logger = LogManager.GetCurrentClassLogger();
+            
+            foreach (var i in Enumerable.Range(0, count))
+            {
+                logger.Log(LogLevel.FromOrdinal(_random.Next(0, 6)), $"message {i}");
+            }
 
-            var target = config.FindTargetByName("clickhouse") as ClickHouseTarget;
-            Assert.NotNull(target);
-            Assert.AreEqual("clickhouse", target.Name);
-            Assert.AreEqual("Host=localhost;Port=9000;Database=logs;User=sa;Password=P@ssw0rd;", target.ConnectionString);
-            Assert.AreEqual("logs.test", target.TableName);
-            Assert.AreEqual(5000, target.BatchSize);
-            Assert.AreEqual(7, target.Columns.Length);
-            Assert.AreEqual(7, target.Parameters.Count);
+            await Task.Delay(TimeSpan.FromSeconds(10));
+            
+            Assert.AreEqual(count, GetTableSize("test"));
         }
-
+        
         [Test]
         [TestCase(5000)]
-        public async Task Sample(int count)
+        public async Task Generate_sample_logs_with_internal_queue(int count)
         {
-            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(XmlConfig);
+            LogManager.Configuration = XmlLoggingConfiguration.CreateFromXmlString(XmlConfigWithInternalQueue);
             var logger = LogManager.GetCurrentClassLogger();
             
             foreach (var i in Enumerable.Range(0, count))

@@ -1,23 +1,25 @@
-# NLog.Targets.ClickHouse
-Implimentation of ClickHouse target for Nlog.
+[![NuGet](https://img.shields.io/nuget/v/NLog.Targets.ClickHouse.svg)](https://www.nuget.org/packages/NLog.Targets.ClickHouse)
+[![NuGet downloads](https://img.shields.io/nuget/dt/NLog.Targets.ClickHouse.svg)](https://www.nuget.org/packages/NLog.Targets.ClickHouse)
 
-## Development plans:
-- improvements of default behavior;
-- initialization query feature to create table and auto-create table support;
-- improvements and expansion of the config parameters list;
-- improved testing and benchmarking;
+# NLog.Targets.ClickHouse
+Implementation of ClickHouse target for Nlog.
+
+## Installation
+
+```shell
+Install-Package NLog -Version 1.1.0
+```
 
 ## Example configuration:
-The ClickHouse target works best with the [BufferingWrapper](https://github.com/NLog/NLog/wiki/BufferingWrapper-target) target applied.
+The ClickHouse target works best together with the [BufferingWrapper](https://github.com/NLog/NLog/wiki/BufferingWrapper-target) target applied.
 
 ```xml
+<?xml version='1.0' encoding='utf-8' ?>
 <nlog xmlns='http://www.nlog-project.org/schemas/NLog.xsd'
       xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
-      internalLogToConsole='true'>
+      internalLogToConsole='true'
+      autoReload='true'>
     <targets>
-        <extensions>
-            <add assembly="NLog.Targets.ClickHouse"/>
-        </extensions>
         <target
                 name='clickhouse_queue'
                 xsi:type='BufferingWrapper'
@@ -26,9 +28,23 @@ The ClickHouse target works best with the [BufferingWrapper](https://github.com/
                 overflowAction='Flush'>
             <target name='clickhouse'
                     xsi:type='ClickHouse'
-                    connectionString='Host=localhost;Port=8123;Username=sa;Password=P@ssw0rd;Database=logs'
-                    tableName='logs.test'
+                    connectionString='Host=localhost;Port=9000;Database=logs;User=sa;Password=P@ssw0rd;'
+                    tableName='test'
                     batchSize='5000'>
+                <install-command text="
+                    CREATE TABLE IF NOT EXISTS test
+                    (
+                        logged DateTime64,
+                        application String,
+                        level LowCardinality(String),
+                        message String,
+                        logger String,
+                        callSite String,
+                        exception Nullable(String)
+                    )
+                    ENGINE Log" />
+                <install-command text="TRUNCATE TABLE test" />
+                <uninstall-command text="DROP TABLE IF EXISTS test" />
                 <parameter name='application' dbType='String' layout='test_app'/>
                 <parameter name='level' dbType='String' layout='${level}' />
                 <parameter name='message' dbType='String' layout='${message}' />
@@ -45,6 +61,13 @@ The ClickHouse target works best with the [BufferingWrapper](https://github.com/
 </nlog>
 ```
 
+## Development plans:
+- [x] add internal queue in target to use instead of BufferedWrapper
+- [ ] improvements of default behavior;
+- [ ] initialization query feature to create or clean table and auto-create table support;
+- [ ] improvements and expansion of the config parameters list;
+- [ ] improved testing and benchmarking;
+
 ## Special thanks
-Many thanks to the authors of the implementations ClickHouse .NET client [DarkWanderer/ClickHouse.Client](https://github.com/DarkWanderer/ClickHouse.Client) and [killwort/ClickHouse-Net](https://github.com/killwort/ClickHouse-Net).
-It was a challenge to choose which implementation to use. Maybe will implement both via interface and config options.
+Many thanks to the authors of the implementations ClickHouse .NET client [killwort/ClickHouse-Net](https://github.com/killwort/ClickHouse-Net) and [DarkWanderer/ClickHouse.Client](https://github.com/DarkWanderer/ClickHouse.Client).
+It was a challenge to choose which implementation to use.
