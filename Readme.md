@@ -7,7 +7,7 @@ Implementation of ClickHouse target for Nlog.
 ## Installation
 
 ```shell
-Install-Package NLog -Version 1.1.0
+Install-Package NLog.Targets.ClickHouse -Version 1.1.0
 ```
 
 ## Example configuration:
